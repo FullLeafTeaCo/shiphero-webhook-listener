@@ -59,10 +59,6 @@ app.post("/webhooks/shiphero", async (req: WebhookRequest, res: Response): Promi
     
     log.info({ type, responseTime: Date.now() - startTime }, `✅ Webhook acknowledged: ${type} (${Date.now() - startTime}ms)`);
 
-    if (type === "Inventory Change") {
-      console.log("inventory change payload in server.js", payload);
-    }
-
     // Enqueue async work
     workQueue.push(async () => {
       try {

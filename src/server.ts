@@ -7,6 +7,7 @@ import { handleInventoryChange } from "./handlers/inventoryChange.js";
 import { handleInventoryUpdate } from "./handlers/inventoryUpdate.js";
 import { handleToteCleared } from "./handlers/toteCleared.js";
 import { handleOrderPackedOut } from "./handlers/orderPackedOut.js";
+import { handleShipmentUpdate } from "./handlers/shipmentUpdate.js";
 
 // Extend Express Request interface to include our custom rawBody property
 interface WebhookRequest extends Request {
@@ -76,6 +77,9 @@ app.post("/webhooks/shiphero", async (req: WebhookRequest, res: Response): Promi
             break;
           case "Order Packed Out":
             await handleOrderPackedOut(payload);
+            break;
+          case "Shipment Update":
+            await handleShipmentUpdate(payload);
             break;
           default:
             log.warn({ type, payload }, `⚠️ Unhandled webhook_type: ${type}`);

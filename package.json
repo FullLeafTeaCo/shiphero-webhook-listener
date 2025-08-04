@@ -15,6 +15,7 @@
     "list:webhooks": "tsx scripts/listWebhooks.ts",
     "test:webhook": "tsx scripts/testWebhookEndpoint.ts",
     "test:inventory-update": "tsx scripts/testInventoryUpdate.ts",
+    "test:product-search": "tsx scripts/testProductSearch.ts",
     "monitor": "tsx scripts/monitorWebhooks.ts",
     "test:send": "tsx scripts/sendTestWebhook.ts",
     "type-check": "tsc --noEmit"

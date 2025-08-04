@@ -36,6 +36,10 @@ Create a `.env` file in the project root:
 SHIPHERO_GRAPHQL_TOKEN=your_shiphero_graphql_token_here
 SHIPHERO_WEBHOOK_SECRET=your_webhook_secret_here
 
+# Shopify API Configuration (optional - for inventory sync)
+SHOPIFY_SHOP_DOMAIN=your-shop.myshopify.com
+SHOPIFY_ACCESS_TOKEN=your_shopify_admin_api_access_token
+
 # Server Configuration
 PORT=3000
 NODE_ENV=development

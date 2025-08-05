@@ -58,7 +58,7 @@ app.post("/webhooks/shiphero", async (req: WebhookRequest, res: Response): Promi
     // ACK FAST — ShipHero expects a quick 200 + JSON body
     res.status(200).json({ code: "200", Status: "Success" });
     
-    log.info({ type, responseTime: Date.now() - startTime }, `✅ Webhook acknowledged: ${type} (${Date.now() - startTime}ms)`);
+    //log.info({ type, responseTime: Date.now() - startTime }, `✅ Webhook acknowledged: ${type} (${Date.now() - startTime}ms)`);
 
     // Enqueue async work
     workQueue.push(async () => {
@@ -85,7 +85,7 @@ app.post("/webhooks/shiphero", async (req: WebhookRequest, res: Response): Promi
             log.warn({ type, payload }, `⚠️ Unhandled webhook_type: ${type}`);
         }
         
-        log.info({ type }, `✅ Webhook processed successfully: ${type}`);
+        //log.info({ type }, `✅ Webhook processed successfully: ${type}`);
       } catch (handlerError) {
         log.error({ type, error: handlerError }, `💥 Webhook handler error: ${type}`);
       }

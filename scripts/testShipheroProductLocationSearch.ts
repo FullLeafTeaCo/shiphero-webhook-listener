@@ -1,10 +1,11 @@
 import dotenv from "dotenv";
 import { findProductBySku } from "../src/shopify.js";
+import { getProductLocations } from "../src/shiphero.js";
 
 dotenv.config();
 
-async function testProductSearch(): Promise<void> {
-  console.log("🔍 Testing Shopify Product Search by SKU...\n");
+async function testShipheroProductLocationSearch(): Promise<void> {
+  console.log("🔍 Testing Shiphero Product Location Search by SKU...\n");
 
   // Test SKUs - you can modify these or add real SKUs from your Shopify store
   const testSkus = [
@@ -17,22 +18,15 @@ async function testProductSearch(): Promise<void> {
     console.log(`🔎 Searching for SKU: "${sku}"`);
     
     try {
-      const product = await findProductBySku(sku);
+      const locations = await getProductLocations(sku);
       
-      if (product) {
-        console.log("✅ Product found!");
-        console.log({
-          id: product.id,
-          displayName: product.displayName,
-          title: product.title,
-          sku: product.sku,
-          inventoryQuantity: product.inventoryQuantity
-        });
+      if (locations) {
+        console.log(locations);
       } else {
-        console.log("❌ Product (", sku, ") not found");
+        console.log("❌ Locations not found");
       }
     } catch (error: any) {
-      console.error("💥 Error searching for product:", error.message);
+      console.error("💥 Error searching for locations:", error.message);
     }
     
     console.log("─".repeat(50));
@@ -40,7 +34,7 @@ async function testProductSearch(): Promise<void> {
 }
 
 // Run the test
-testProductSearch()
+testShipheroProductLocationSearch()
   .then(() => {
     console.log("\n🎉 Test completed!");
     process.exit(0);

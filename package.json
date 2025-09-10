@@ -14,10 +14,12 @@
     "delete:webhooks": "tsx scripts/deleteWebhooks.ts",
     "list:webhooks": "tsx scripts/listWebhooks.ts",
     "test:webhook": "tsx scripts/testWebhookEndpoint.ts",
+    "test:packer": "tsx scripts/testOrderPackedOut.ts",
+    "test:picker": "tsx scripts/testToteCleared.ts",
     "test:inventory-update": "tsx scripts/testInventoryUpdate.ts",
     "test:product-search": "tsx scripts/testProductSearch.ts",
-    "monitor": "tsx scripts/monitorWebhooks.ts",
     "test:send": "tsx scripts/sendTestWebhook.ts",
+    "setup:ttl": "tsx scripts/setupDedupTTL.ts",
     "type-check": "tsc --noEmit"
   },
   "keywords": [],
@@ -28,6 +30,7 @@
     "express": "^5.1.0",
     "node-fetch": "^3.3.2",
     "pino": "^9.7.0",
+    "firebase-admin": "^12.6.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

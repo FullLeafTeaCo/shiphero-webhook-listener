@@ -7,7 +7,7 @@ if (!base) {
 }
 
 const webhookUrl = `${base}/webhooks/shiphero`;
-const type = "Shipment Update";
+const type = "Order Canceled";
 
 (async (): Promise<void> => {
   const r = await createWebhook({ url: webhookUrl, type });

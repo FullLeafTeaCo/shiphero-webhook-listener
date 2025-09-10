@@ -11,8 +11,7 @@ const type = "Order Packed Out";
 
 (async (): Promise<void> => {
   const r = await createWebhook({ url: webhookUrl, type });
-  console.log("Created:", r.webhook_create.webhook);
 })().catch((e: Error) => {
   console.error(e);
   process.exit(1);
-}); 
+});

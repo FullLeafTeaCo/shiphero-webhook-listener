@@ -7,14 +7,14 @@ const types: string[] = [
   "Tote Cleared",
   "Order Packed Out",
   "Shipment Update",
+  "Order Canceled",
 ];
 
 (async (): Promise<void> => {
   for (const type of types) {
     const r = await deleteWebhook({ name: type });
-    console.log("Deleted:", type);
   }
 })().catch((e: Error) => {
   console.error(e);
   process.exit(1);
-}); 
+});

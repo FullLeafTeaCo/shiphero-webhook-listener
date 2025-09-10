@@ -13,15 +13,15 @@ const types: string[] = [
   "Inventory Update",
   "Tote Cleared",
   "Order Packed Out",
-  "Shipment Update"
+  "Shipment Update",
+  "Order Canceled", // Added for outstanding order tracking
 ];
 
 (async (): Promise<void> => {
   for (const type of types) {
     const r = await createWebhook({ url: webhookUrl, type });
-    console.log("Created:", r.webhook_create.webhook);
   }
 })().catch((e: Error) => {
   console.error(e);
   process.exit(1);
-}); 
+});

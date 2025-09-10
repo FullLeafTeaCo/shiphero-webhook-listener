@@ -2,7 +2,6 @@ import "dotenv/config";
 import { deleteWebhook } from "../src/shiphero.js";
 
 const types: string[] = [
-  "Inventory Change",
   "Inventory Update",
   "Tote Cleared",
   "Order Packed Out",
@@ -12,8 +11,20 @@ const types: string[] = [
 
 (async (): Promise<void> => {
   for (const type of types) {
-    const r = await deleteWebhook({ name: type });
+    try {
+      console.log(`Deleting webhook: ${type}`);
+      const r = await deleteWebhook({ name: type });
+      console.log(`✅ Successfully deleted: ${type}`);
+    } catch (error: any) {
+      if (error.message.includes("Webhook not found")) {
+        console.log(`⚠️  Webhook not found (may already be deleted): ${type}`);
+      } else {
+        console.error(`❌ Error deleting ${type}:`, error.message);
+        throw error;
+      }
+    }
   }
+  console.log("🎉 Webhook deletion process completed");
 })().catch((e: Error) => {
   console.error(e);
   process.exit(1);

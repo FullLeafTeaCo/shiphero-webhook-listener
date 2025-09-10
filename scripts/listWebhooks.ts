@@ -6,9 +6,10 @@ import { listWebhooks } from "../src/shiphero.js";
     const r = await listWebhooks();
     const webhooks = r.webhooks.data.edges;
 
+    console.log(`Found ${webhooks.length} webhooks:`);
     webhooks.forEach((webhook, index) => {
       const w = webhook.node;
-      // Webhook details available but not logged
+      console.log(`${index + 1}. ${w.name} - ${w.url} (ID: ${w.id})`);
     });
   } catch (error: any) {
     console.error("Error listing webhooks:", error.message);

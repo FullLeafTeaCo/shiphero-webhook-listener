@@ -9,7 +9,7 @@ if (!base) {
 const webhookUrl = `${base}/webhooks/shiphero`;
 
 const types: string[] = [
-  "Inventory Change",
+  //"Inventory Change",
   "Inventory Update",
   "Tote Cleared",
   "Order Packed Out",

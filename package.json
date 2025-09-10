@@ -18,6 +18,8 @@
     "test:picker": "tsx scripts/testToteCleared.ts",
     "test:inventory-update": "tsx scripts/testInventoryUpdate.ts",
     "test:product-search": "tsx scripts/testProductSearch.ts",
+    "test:shiphero-product-location-search": "tsx scripts/testShipheroProductLocationSearch.ts",
+    "monitor": "tsx scripts/monitorWebhooks.ts",
     "test:send": "tsx scripts/sendTestWebhook.ts",
     "setup:ttl": "tsx scripts/setupDedupTTL.ts",
     "type-check": "tsc --noEmit"

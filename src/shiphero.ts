@@ -212,5 +212,52 @@ export async function listWebhooks(): Promise<ListWebhooksResponse> {
   return gql<ListWebhooksResponse>(query);
 }
 
+export async function getProductLocations(sku: string): Promise<any> {
+  const query = `
+    query ProductLocations($sku: String!) {
+      product(sku: $sku) {
+        request_id
+        data {
+          id
+          sku
+          name
+          warehouse_products {
+            locations {
+              edges {
+                node {
+                  location {
+                    type { name }
+                    name
+                  }
+                  quantity
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    sku: sku
+  };
+
+  try {
+    const response = await gql<any>(query, variables);
+
+    console.log(response);
+
+    if (!response) {
+      return null;
+    }
+
+    return response.product.data;
+  } catch (error) {
+    console.error(`Error searching for product with SKU ${sku}:`, error);
+    throw error;
+  }
+}
+
 // Export token refresh function for testing
 export { refreshAccessToken, getValidAccessToken };

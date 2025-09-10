@@ -18,7 +18,7 @@ async function testProductSearch(): Promise<void> {
       if (product) {
         // Product found - details available but not logged
       } else {
-        // Product not found
+        console.log("❌ Product (", sku, ") not found");
       }
     } catch (error: any) {
       console.error("💥 Error searching for product:", error.message);

@@ -101,6 +101,7 @@ export async function incrementProcessedForToday(opts: {
         updatedAt: FieldValue.serverTimestamp(),
         processed: FieldValue.increment(1),
         hourly,
+        source: "webhook",
       },
       { merge: true }
     );
@@ -297,6 +298,7 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
             shipments: FieldValue.increment(newLabels),
           },
           updatedAt: FieldValue.serverTimestamp(),
+          source: "webhook",
         },
         { merge: true }
       );
@@ -320,6 +322,7 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
         {
           shipped: { orders: FieldValue.increment(1) },
           updatedAt: FieldValue.serverTimestamp(),
+          source: "webhook",
         },
         { merge: true }
       );
@@ -358,6 +361,7 @@ export async function processOrderPackedOutWebhook(body: any): Promise<void> {
         {
           itemsPacked: { items: FieldValue.increment(itemsCount) },
           updatedAt: FieldValue.serverTimestamp(),
+          source: "webhook",
         },
         { merge: true }
       );
@@ -386,6 +390,7 @@ export async function processOrderPackedOutWebhook(body: any): Promise<void> {
           outstanding: FieldValue.increment(-1),
           outstandingUpdatedAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
+          source: "webhook",
         },
         { merge: true }
       );
@@ -433,6 +438,7 @@ export async function processToteClearedWebhook(body: any): Promise<void> {
             items: FieldValue.increment(items.length), // approximate — one per row
           },
           updatedAt: FieldValue.serverTimestamp(),
+          source: "webhook",
         },
         { merge: true }
       );
@@ -460,6 +466,7 @@ export async function processToteClearedWebhook(body: any): Promise<void> {
         {
           itemsPicked: { orders: FieldValue.increment(newOrderTouches) },
           updatedAt: FieldValue.serverTimestamp(),
+          source: "webhook",
         },
         { merge: true }
       );

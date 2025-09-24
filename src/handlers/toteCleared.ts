@@ -24,48 +24,15 @@ export async function handleToteCleared(payload: any): Promise<void> {
   const cleared_at =
     payload?.cleared_at ?? payload?.timestamp ?? new Date().toISOString();
 
-  log.info(
-    {
-      account_id,
-      tote_id,
-      tote_name,
-      cleared_by_user_id,
-      cleared_by_name,
-      cleared_at,
-      warehouse_id,
-      warehouse_name,
-      items_picked,
-      pick_time_seconds,
-      payloadKeys: Object.keys(payload || {}),
-    },
-    "🧺 Processing Tote Cleared - Picker Activity"
-  );
+ 
 
-  // DASHBOARD METRICS: Picker productivity
-  log.info(
-    {
-      tote_id,
-      tote_name,
-      picker_id: cleared_by_user_id,
-      picker_name: cleared_by_name,
-      items_picked,
-      pick_time_seconds,
-      warehouse_name,
-      cleared_at,
-    },
-    `🧺 PICKER COMPLETED: ${cleared_by_name} cleared tote ${tote_name} with ${
-      items_picked || 0
-    } items`
-  );
+  
 
   // Process webhook analytics for real-time counters (always do this regardless of user attribution)
   try {
     const normalizedPayload = normalizeToteClearedForAnalytics(payload);
     await processToteClearedWebhook(normalizedPayload);
-    log.info(
-      { tote_id, tote_name },
-      "📊 Updated tote cleared analytics counters"
-    );
+  
   } catch (analyticsError) {
     log.error(
       { tote_id, tote_name, error: analyticsError },

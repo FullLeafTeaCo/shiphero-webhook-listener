@@ -50,15 +50,6 @@ const webhookHandler = async (
     const payload: any = req.body || {};
     const type: string = payload?.webhook_type;
 
-    log.info(
-      {
-        type,
-        hasSignature: !!sigHeader,
-        payloadSize: rawBody.length,
-        userAgent: req.header("user-agent"),
-      },
-      `🎣 Webhook received: ${type}`
-    );
 
     if (!sigHeader || !safeEqual(sigHeader, computedSig)) {
       log.warn(
@@ -72,15 +63,9 @@ const webhookHandler = async (
     // ACK FAST — ShipHero expects a quick 200 + JSON body
     res.status(200).json({ code: "200", Status: "Success" });
 
-    log.info(
-      { type, responseTime: Date.now() - startTime },
-      `✅ Webhook acknowledged: ${type} (${Date.now() - startTime}ms)`
-    );
-
     // Enqueue async work
     workQueue.push(async () => {
       try {
-        log.info({ type }, `🔄 Processing webhook: ${type}`);
 
         switch (type) {
           case "Inventory Change":
@@ -105,7 +90,6 @@ const webhookHandler = async (
             log.warn({ type, payload }, `⚠️ Unhandled webhook_type: ${type}`);
         }
 
-        log.info({ type }, `✅ Webhook processed successfully: ${type}`);
       } catch (handlerError) {
         log.error(
           { type, error: handlerError },
@@ -142,7 +126,7 @@ app.head("/shiphero/webhook", (_req: Request, res: Response) =>
 app.post(
   "/api/warehouse/refresh-today",
   async (_req: Request, res: Response) => {
-    log.info({}, "📥 Manual refresh of today's outstanding requested");
+
     // This should trigger the poller elsewhere; for now, just acknowledge
     res.status(202).json({ status: "accepted" });
   }

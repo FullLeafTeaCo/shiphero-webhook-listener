@@ -67,10 +67,7 @@ export async function handleInventoryChange(payload: any): Promise<void> {
 
   try {
     await ref.set(record);
-    log.info(
-      { sku, delta, oldOnHand, newOnHand, ymd, ref: ref.path },
-      "📦 Saved inventory change event"
-    );
+
   } catch (err) {
     log.error({ err, sku, ymd }, "💥 Failed to save inventory change");
   }

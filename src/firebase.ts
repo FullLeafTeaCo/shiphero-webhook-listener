@@ -31,10 +31,6 @@ function init(): void {
       }
       app = initializeApp({ credential: cert(parsed) });
 
-      log.info(
-        { projectId: process.env.GOOGLE_CLOUD_PROJECT },
-        "✅ Firebase initialized with inline service account JSON"
-      );
     } else if (jsonPath && fs.existsSync(jsonPath)) {
       const fullPath = path.resolve(jsonPath);
       const parsed = JSON.parse(fs.readFileSync(fullPath, "utf8"));
@@ -43,11 +39,6 @@ function init(): void {
         process.env.GOOGLE_CLOUD_PROJECT = projectId;
       }
       app = initializeApp({ credential: cert(parsed) });
-
-      log.info(
-        { jsonPath: fullPath, projectId: process.env.GOOGLE_CLOUD_PROJECT },
-        "✅ Firebase initialized with service account file"
-      );
     } else {
       // Last resort: allow explicit project id hint
       if (
@@ -57,10 +48,7 @@ function init(): void {
         process.env.GOOGLE_CLOUD_PROJECT = process.env.FIREBASE_PROJECT_ID;
       }
       app = initializeApp({ credential: applicationDefault() });
-      log.info(
-        { projectId: process.env.GOOGLE_CLOUD_PROJECT },
-        "✅ Firebase initialized with Application Default Credentials"
-      );
+  
     }
   } catch (e) {
     log.error(

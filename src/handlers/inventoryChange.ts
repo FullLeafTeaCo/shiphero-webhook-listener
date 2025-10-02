@@ -1,6 +1,8 @@
 import { createLogger } from "../logger.js";
 import { firestore, FieldValue } from "../firebase.js";
 import { todayYmd, DEFAULT_TZ } from "../utils/time.js";
+import { upsertBinSnapshotFromEvent } from "../updater/binInventory.js";
+import { bumpSkuTotalFromEvent, upsertSkuSnapshotFromEvent } from "../updater/skuInventory.js";
 
 const log = createLogger("inventoryChange");
 
@@ -70,5 +72,23 @@ export async function handleInventoryChange(payload: any): Promise<void> {
 
   } catch (err) {
     log.error({ err, sku, ymd }, "💥 Failed to save inventory change");
+  }
+
+  try {
+    await upsertBinSnapshotFromEvent(record)
+  } catch (err) {
+    log.error({ err, sku, location_name, warehouse_uuid }, "💥 Failed to upsert bin snapshot");
+  }
+
+  try {
+    await upsertSkuSnapshotFromEvent(record)
+  } catch (err) {
+    log.error({ err, sku, location_name, warehouse_uuid }, "💥 Failed to upsert sku snapshot");
+  }
+
+  try {
+    await bumpSkuTotalFromEvent(record)
+  } catch (err) {
+    log.error({ err, sku, location_name, warehouse_uuid }, "💥 Failed to bump sku total");
   }
 }

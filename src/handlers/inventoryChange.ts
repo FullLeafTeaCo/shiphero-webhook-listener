@@ -73,12 +73,11 @@ export async function handleInventoryChange(payload: any): Promise<void> {
 
   // Apply the delta + link this exact event
   try {
-    await applyInventoryDelta({
+    const inventoryDeltaParams: any = {
       warehouse_uuid,
       location_name,
       sku,
       delta: Number(quantity || 0),
-      new_on_hand: (payload as any).new_on_hand ?? undefined,
       lot_id,
       lot_uuid,
       lot_name: (payload as any).lot_name ?? null,
@@ -87,7 +86,14 @@ export async function handleInventoryChange(payload: any): Promise<void> {
       event_ref_path: eventRef.path,
       event_direction: direction,
       event_timestamp: timestamp,
-    });
+    };
+
+    // Only include new_on_hand if it's not undefined
+    if ((payload as any).new_on_hand !== undefined) {
+      inventoryDeltaParams.new_on_hand = (payload as any).new_on_hand;
+    }
+
+    await applyInventoryDelta(inventoryDeltaParams);
   } catch (err) {
     log.error(
       { err, sku, location_name },

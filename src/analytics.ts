@@ -1,9 +1,11 @@
+// functions/src/analytics.ts
 import { firestore, FieldValue } from "./firebase.js";
-import { todayYmd, hourLabel, DEFAULT_TZ, nowIso } from "./utils/time.js";
+import { todayYmd, hourLabel, DEFAULT_TZ } from "./utils/time.js";
 import { createLogger } from "./logger.js";
 
 const log = createLogger("analytics");
 
+// ---------- Helpers ----------
 function idempotencyKeyFrom(
   parts: Array<string | number | undefined | null>
 ): string {
@@ -51,6 +53,7 @@ export async function markShipmentCompletedOnce(opts: {
   return res;
 }
 
+// ---------- (kept) processed_today helper ----------
 export async function incrementProcessedForToday(opts: {
   orderId?: string | number;
   shippedAt?: string | number | Date;
@@ -61,7 +64,6 @@ export async function incrementProcessedForToday(opts: {
   const ymd = todayYmd(DEFAULT_TZ, opts.shippedAt);
   const hour = hourLabel(DEFAULT_TZ, opts.shippedAt);
 
-  // processed_today idempotency per order per day
   const processedDocId = `${ymd}_${opts.orderId ?? "unknown"}`;
   const processedRef = db
     .collection("idempotency_processed_today")
@@ -69,14 +71,10 @@ export async function incrementProcessedForToday(opts: {
 
   await db.runTransaction(async (tx) => {
     const seenSnap = await tx.get(processedRef);
-    if (seenSnap.exists) {
-      return; // already counted for today
-    }
+    if (seenSnap.exists) return;
 
-    // Mark as seen first to prevent double counting across retries
     tx.set(processedRef, { at: FieldValue.serverTimestamp() }, { merge: true });
 
-    // stats/today
     const statsTodayRef = db.collection("stats").doc("today");
     const statsTodaySnap = await tx.get(statsTodayRef);
     const statToday = statsTodaySnap.exists
@@ -106,7 +104,6 @@ export async function incrementProcessedForToday(opts: {
       { merge: true }
     );
 
-    // daily/{date}
     const dailyRef = db.collection("daily").doc(ymd);
     tx.set(
       dailyRef,
@@ -120,94 +117,31 @@ export async function incrementProcessedForToday(opts: {
   });
 }
 
-export async function incrementLeaderboard(opts: {
+// ---------- DEPRECATED helpers (kept as no-ops) ----------
+export async function incrementLeaderboard(_: {
   kind: "pickers" | "packers";
   userId?: string | number;
   name?: string;
   at?: string | number | Date;
 }): Promise<void> {
-  // This function is deprecated - use incrementPacker or incrementPicker instead
-  if (opts.kind === "packers") {
-    return incrementPacker(opts);
-  } else {
-    return incrementPicker(opts);
-  }
+  return;
 }
-
-// Because Firestore SDK needs explicit document paths, provide concrete helpers
-export async function incrementPacker(opts: {
+export async function incrementPacker(_: {
   userId?: string | number;
   name?: string;
   at?: string | number | Date;
 }): Promise<void> {
-  return incrementUser("packers", opts);
+  return;
 }
-
-export async function incrementPicker(opts: {
+export async function incrementPicker(_: {
   userId?: string | number;
   name?: string;
   at?: string | number | Date;
 }): Promise<void> {
-  return incrementUser("pickers", opts);
+  return;
 }
 
-async function incrementUser(
-  kind: "pickers" | "packers",
-  opts: { userId?: string | number; name?: string; at?: string | number | Date }
-): Promise<void> {
-  const db = firestore();
-  const ymd = todayYmd(DEFAULT_TZ, opts.at);
-  const userKey = String(opts.userId ?? "unknown");
-  const name = opts.name ?? "Unknown";
-
-  await db.runTransaction(async (tx) => {
-    // leaderboards/today/{kind}
-    const todayRef = db
-      .collection("leaderboards")
-      .doc("today")
-      .collection("data")
-      .doc(kind);
-    // mirror to /daily/{date}/{kind}
-    const dailyRef = db
-      .collection("daily")
-      .doc(ymd)
-      .collection("data")
-      .doc(kind);
-
-    // ALL READS FIRST
-    const todaySnap = await tx.get(todayRef);
-    const dailySnap = await tx.get(dailyRef);
-
-    // Process data
-    const todayData = todaySnap.exists ? (todaySnap.data() as any) : {};
-    const current = todayData[userKey] || { name, count: 0 };
-    current.name = name; // keep latest name
-    current.count = (current.count || 0) + 1;
-
-    const dailyData = dailySnap.exists ? (dailySnap.data() as any) : {};
-    const dcur = dailyData[userKey] || { name, count: 0 };
-    dcur.name = name;
-    dcur.count = (dcur.count || 0) + 1;
-
-    // ALL WRITES AFTER
-    tx.set(
-      todayRef,
-      {
-        [userKey]: current,
-      },
-      { merge: true }
-    );
-
-    tx.set(
-      dailyRef,
-      {
-        [userKey]: dcur,
-      },
-      { merge: true }
-    );
-  });
-}
-
+// ---------- Idempotency key for any ShipHero payload ----------
 export function buildIdempotencyKeyForPayload(payload: any): string {
   const t = payload?.webhook_type;
   return idempotencyKeyFrom([
@@ -223,10 +157,10 @@ export function buildIdempotencyKeyForPayload(payload: any): string {
   ]);
 }
 
-// ---- Webhook-based Analytics Functions ----
-
 /**
- * Process shipment update webhook - count labels/shipments and distinct orders shipped
+ * Shipment update webhook — unchanged (still dedups labels + shipped orders).
+ * If you want the poller to own shipped counters too, we can later downshift
+ * this handler to “record-only” just like packed_out.
  */
 export async function processShipmentUpdateWebhook(body: any): Promise<void> {
   const db = firestore();
@@ -240,12 +174,11 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
   const trackingNumbers: string[] = pkgs
     .map((p) => p?.shipping_label?.tracking_number)
     .filter(Boolean);
+
   await db.runTransaction(async (tx) => {
-    // ALL READS FIRST
     const labelChecks: { [key: string]: boolean } = {};
     let newLabels = 0;
 
-    // Check all labels first
     for (const tn of trackingNumbers) {
       const labelRef = db
         .collection("dedup")
@@ -254,12 +187,9 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
         .doc(tn);
       const snap = await tx.get(labelRef);
       labelChecks[tn] = !snap.exists;
-      if (labelChecks[tn]) {
-        newLabels++;
-      }
+      if (!snap.exists) newLabels++;
     }
 
-    // Check if order is new
     let isNewOrder = false;
     if (orderKey) {
       const ordRef = db
@@ -271,8 +201,6 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
       isNewOrder = !os.exists;
     }
 
-    // ALL WRITES AFTER
-    // Write new labels
     for (const tn of trackingNumbers) {
       if (labelChecks[tn]) {
         const labelRef = db
@@ -280,12 +208,8 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
           .doc(ymd)
           .collection("labels")
           .doc(tn);
-        const expireAt = new Date();
-        expireAt.setDate(expireAt.getDate() + 14); // 14 days TTL
-        tx.set(labelRef, {
-          createdAt: FieldValue.serverTimestamp(),
-          expireAt: expireAt,
-        });
+        const expireAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+        tx.set(labelRef, { createdAt: FieldValue.serverTimestamp(), expireAt });
       }
     }
 
@@ -304,19 +228,14 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
       );
     }
 
-    // Write new order
     if (orderKey && isNewOrder) {
       const ordRef = db
         .collection("dedup")
         .doc(ymd)
         .collection("shipped_orders")
         .doc(orderKey);
-      const expireAt = new Date();
-      expireAt.setDate(expireAt.getDate() + 14); // 14 days TTL
-      tx.set(ordRef, {
-        createdAt: FieldValue.serverTimestamp(),
-        expireAt: expireAt,
-      });
+      const expireAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      tx.set(ordRef, { createdAt: FieldValue.serverTimestamp(), expireAt });
       tx.set(
         statsRef,
         {
@@ -331,142 +250,138 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
 }
 
 /**
- * Process order packed out webhook - count items packed and distinct orders processed
+ * Packed out webhook — **REFACTORED TO RECORD-ONLY**.
+ * Writes the raw payload under: packed_out/{YMD}/data/{autoId}
+ * Idempotent by an event key derived from the payload; duplicates are ignored.
  */
 export async function processOrderPackedOutWebhook(body: any): Promise<void> {
   const db = firestore();
-  const ymd = todayYmd(DEFAULT_TZ);
-  const statsRef = db.collection("stats").doc(ymd);
-  const orderKey: string = body?.order_uuid || String(body?.order_id || "");
-  const items: any[] = Array.isArray(body?.items) ? body.items : [];
-  const itemsCount = items.length;
-  await db.runTransaction(async (tx) => {
-    // ALL READS FIRST
-    let isNewOrder = false;
-    if (orderKey) {
-      const ordRef = db
-        .collection("dedup")
-        .doc(ymd)
-        .collection("packed_orders")
-        .doc(orderKey);
-      const os = await tx.get(ordRef);
-      isNewOrder = !os.exists;
-    }
+  const ymd = todayYmd(DEFAULT_TZ, body?.packed_at);
 
-    // ALL WRITES AFTER
-    // increment itemsPacked.items (approximate — one per row)
-    if (itemsCount > 0) {
-      tx.set(
-        statsRef,
-        {
-          itemsPacked: { items: FieldValue.increment(itemsCount) },
-          updatedAt: FieldValue.serverTimestamp(),
-          source: "webhook",
-        },
-        { merge: true }
-      );
-    }
+  // Make this idempotent so we don’t store duplicates of the same event
+  const key =
+    buildIdempotencyKeyForPayload({ ...body, webhook_type: "packed_out" }) ||
+    idempotencyKeyFrom([
+      "packed_out_fallback",
+      body?.order_uuid ?? body?.order_id,
+      body?.shipment_id,
+      body?.packed_by_user_id,
+      body?.packed_at,
+      Array.isArray(body?.items) ? body.items.length : 0,
+    ]);
 
-    // count distinct orders packed today (itemsPacked.orders)
-    if (orderKey && isNewOrder) {
-      const ordRef = db
-        .collection("dedup")
-        .doc(ymd)
-        .collection("packed_orders")
-        .doc(orderKey);
-      const expireAt = new Date();
-      expireAt.setDate(expireAt.getDate() + 14); // 14 days TTL
-      tx.set(ordRef, {
-        createdAt: FieldValue.serverTimestamp(),
-        expireAt: expireAt,
-      });
-      tx.set(
-        statsRef,
-        {
-          itemsPacked: { orders: FieldValue.increment(1) },
-          // your "processed" mirrors unique orders from packs
-          processed: FieldValue.increment(1),
-          // decrement outstanding when order is processed
-          outstanding: FieldValue.increment(-1),
-          outstandingUpdatedAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-          source: "webhook",
-        },
-        { merge: true }
-      );
-    }
-  });
+  const firstTime = await ensureIdempotentEvent(key);
+  if (!firstTime) {
+    log.info({ key }, "[packed_out] duplicate webhook ignored");
+    return;
+  }
+
+  // Persist the event (raw “spread”) with a few helpful metadata fields
+  const eventRef = db
+    .collection("packed_out")
+    .doc(ymd)
+    .collection("data")
+    .doc();
+  const record = {
+    ...body, // spread everything ShipHero sent
+    _meta: {
+      idempotencyKey: key,
+      ymd,
+      source: "webhook",
+      type: "packed_out",
+    },
+    receivedAt: FieldValue.serverTimestamp(),
+  };
+
+  await eventRef.set(record);
+  log.info({ ymd, docPath: eventRef.path }, "[packed_out] event recorded");
 }
 
 /**
- * Process tote cleared webhook - count items picked and distinct orders
+ * Tote cleared webhook — current behavior still updates pick totals.
+ * If you prefer this to be record-only as well, say the word and I’ll mirror
+ * the same pattern to `picked_out/{ymd}` (or a name you choose).
  */
 export async function processToteClearedWebhook(body: any): Promise<void> {
   const db = firestore();
   const ymd = todayYmd(DEFAULT_TZ);
   const statsRef = db.collection("stats").doc(ymd);
-  const items: any[] = Array.isArray(body?.items) ? body.items : [];
-  const orders = new Set<string>();
-  for (const it of items) {
-    const k = String(it?.order_id || "");
-    if (k) orders.add(k);
-  }
-  await db.runTransaction(async (tx) => {
-    // ALL READS FIRST
-    const orderChecks: { [key: string]: boolean } = {};
-    let newOrderTouches = 0;
 
-    for (const k of orders) {
-      const ordRef = db
+  const items: any[] = Array.isArray(body?.items) ? body.items : [];
+
+  await db.runTransaction(async (tx) => {
+    let itemsToAdd = 0;
+    let ordersToAdd = 0;
+
+    for (const it of items) {
+      const order_id = it?.order_id ? String(it.order_id) : undefined;
+      const user_id = String(body?.cleared_by_user_id ?? "unknown");
+      const user_name =
+        [body?.cleared_by_user_first_name, body?.cleared_by_user_last_name]
+          .filter(Boolean)
+          .join(" ") || "Unknown";
+      const created_at = body?.cleared_at;
+      const picked_quantity = 1; // your previous approximation
+
+      const sig = [
+        order_id ?? "",
+        user_id ?? "",
+        created_at ?? "",
+        String(picked_quantity),
+      ].join("|");
+
+      const edgeRef = db
         .collection("dedup")
         .doc(ymd)
-        .collection("picked_orders")
-        .doc(k);
-      const os = await tx.get(ordRef);
-      orderChecks[k] = !os.exists;
-      if (orderChecks[k]) {
-        newOrderTouches++;
-      }
-    }
+        .collection("pick_edges")
+        .doc(sig);
+      const snap = await tx.get(edgeRef);
+      if (snap.exists) continue;
 
-    // ALL WRITES AFTER
-    if (items.length > 0) {
+      const expireAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      tx.set(edgeRef, {
+        createdAt: FieldValue.serverTimestamp(),
+        expireAt,
+        user_id,
+        order_id: order_id ?? null,
+        qty: picked_quantity,
+        source: "webhook",
+      });
+
+      // per-user attribution (legacy path; poller is now the authority)
+      const userRef = db
+        .collection("leaderboards")
+        .doc(ymd)
+        .collection("pickers")
+        .doc(user_id);
       tx.set(
-        statsRef,
+        userRef,
         {
-          itemsPicked: {
-            items: FieldValue.increment(items.length), // approximate — one per row
-          },
-          updatedAt: FieldValue.serverTimestamp(),
-          source: "webhook",
+          name: user_name,
+          items: FieldValue.increment(picked_quantity),
+          orders: FieldValue.increment(order_id ? 1 : 0),
         },
         { merge: true }
       );
+
+      itemsToAdd += picked_quantity;
+      if (order_id) ordersToAdd += 1;
     }
 
-    // Write new orders
-    for (const k of orders) {
-      if (orderChecks[k]) {
-        const ordRef = db
-          .collection("dedup")
-          .doc(ymd)
-          .collection("picked_orders")
-          .doc(k);
-        const expireAt = new Date();
-        expireAt.setDate(expireAt.getDate() + 14); // 14 days TTL
-        tx.set(ordRef, {
-          createdAt: FieldValue.serverTimestamp(),
-          expireAt: expireAt,
-        });
-      }
-    }
-    if (newOrderTouches > 0) {
+    if (itemsToAdd > 0 || ordersToAdd > 0) {
       tx.set(
         statsRef,
         {
-          itemsPicked: { orders: FieldValue.increment(newOrderTouches) },
           updatedAt: FieldValue.serverTimestamp(),
           source: "webhook",
+          itemsPicked: {
+            ...(itemsToAdd > 0
+              ? { items: FieldValue.increment(itemsToAdd) }
+              : {}),
+            ...(ordersToAdd > 0
+              ? { orders: FieldValue.increment(ordersToAdd) }
+              : {}),
+          },
         },
         { merge: true }
       );

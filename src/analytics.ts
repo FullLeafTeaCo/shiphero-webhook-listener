@@ -158,14 +158,13 @@ export function buildIdempotencyKeyForPayload(payload: any): string {
 }
 
 /**
- * Shipment update webhook — unchanged (still dedups labels + shipped orders).
- * If you want the poller to own shipped counters too, we can later downshift
- * this handler to “record-only” just like packed_out.
+ * Shipment update webhook — **REFACTORED TO RECORD-ONLY**.
+ * Writes dedup records for labels and shipped orders to prevent duplicates.
+ * Stats counters are now managed by the poller system.
  */
 export async function processShipmentUpdateWebhook(body: any): Promise<void> {
   const db = firestore();
   const ymd = todayYmd(DEFAULT_TZ);
-  const statsRef = db.collection("stats").doc(ymd);
 
   const orderKey: string =
     body?.fulfillment?.order_uuid ||
@@ -213,21 +212,6 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
       }
     }
 
-    if (newLabels > 0) {
-      tx.set(
-        statsRef,
-        {
-          shipped: {
-            labels: FieldValue.increment(newLabels),
-            shipments: FieldValue.increment(newLabels),
-          },
-          updatedAt: FieldValue.serverTimestamp(),
-          source: "webhook",
-        },
-        { merge: true }
-      );
-    }
-
     if (orderKey && isNewOrder) {
       const ordRef = db
         .collection("dedup")
@@ -236,15 +220,6 @@ export async function processShipmentUpdateWebhook(body: any): Promise<void> {
         .doc(orderKey);
       const expireAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
       tx.set(ordRef, { createdAt: FieldValue.serverTimestamp(), expireAt });
-      tx.set(
-        statsRef,
-        {
-          shipped: { orders: FieldValue.increment(1) },
-          updatedAt: FieldValue.serverTimestamp(),
-          source: "webhook",
-        },
-        { merge: true }
-      );
     }
   });
 }
@@ -298,21 +273,17 @@ export async function processOrderPackedOutWebhook(body: any): Promise<void> {
 }
 
 /**
- * Tote cleared webhook — current behavior still updates pick totals.
- * If you prefer this to be record-only as well, say the word and I’ll mirror
- * the same pattern to `picked_out/{ymd}` (or a name you choose).
+ * Tote cleared webhook — **REFACTORED TO RECORD-ONLY**.
+ * Writes dedup records for pick edges and updates leaderboard per-user stats.
+ * Stats counters are now managed by the poller system.
  */
 export async function processToteClearedWebhook(body: any): Promise<void> {
   const db = firestore();
   const ymd = todayYmd(DEFAULT_TZ);
-  const statsRef = db.collection("stats").doc(ymd);
 
   const items: any[] = Array.isArray(body?.items) ? body.items : [];
 
   await db.runTransaction(async (tx) => {
-    let itemsToAdd = 0;
-    let ordersToAdd = 0;
-
     for (const it of items) {
       const order_id = it?.order_id ? String(it.order_id) : undefined;
       const user_id = String(body?.cleared_by_user_id ?? "unknown");
@@ -360,28 +331,6 @@ export async function processToteClearedWebhook(body: any): Promise<void> {
           name: user_name,
           items: FieldValue.increment(picked_quantity),
           orders: FieldValue.increment(order_id ? 1 : 0),
-        },
-        { merge: true }
-      );
-
-      itemsToAdd += picked_quantity;
-      if (order_id) ordersToAdd += 1;
-    }
-
-    if (itemsToAdd > 0 || ordersToAdd > 0) {
-      tx.set(
-        statsRef,
-        {
-          updatedAt: FieldValue.serverTimestamp(),
-          source: "webhook",
-          itemsPicked: {
-            ...(itemsToAdd > 0
-              ? { items: FieldValue.increment(itemsToAdd) }
-              : {}),
-            ...(ordersToAdd > 0
-              ? { orders: FieldValue.increment(ordersToAdd) }
-              : {}),
-          },
         },
         { merge: true }
       );

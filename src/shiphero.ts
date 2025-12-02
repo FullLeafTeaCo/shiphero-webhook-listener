@@ -259,5 +259,38 @@ export async function getProductLocations(sku: string): Promise<any> {
   }
 }
 
+export async function getOrderShippingZipcode(orderUuid: string): Promise<string | null> {
+  const query = `
+    query GetOrderShippingAddress($id: String!) {
+      order(id: $id) {
+        request_id
+        data {
+          id
+          shipping_address {
+            zip
+          }
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    id: orderUuid
+  };
+
+  try {
+    const response = await gql<any>(query, variables);
+
+    if (!response?.order?.data?.shipping_address) {
+      return null;
+    }
+
+    return response.order.data.shipping_address.zip || null;
+  } catch (error) {
+    console.error(`Error fetching order shipping zipcode for order ${orderUuid}:`, error);
+    return null;
+  }
+}
+
 // Export token refresh function for testing
 export { refreshAccessToken, getValidAccessToken };

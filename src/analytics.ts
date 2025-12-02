@@ -2,6 +2,7 @@
 import { firestore, FieldValue } from "./firebase.js";
 import { todayYmd, hourLabel, DEFAULT_TZ } from "./utils/time.js";
 import { createLogger } from "./logger.js";
+import { getOrderShippingZipcode } from "./shiphero.js";
 
 const log = createLogger("analytics");
 
@@ -251,7 +252,23 @@ export async function processOrderPackedOutWebhook(body: any): Promise<void> {
     return;
   }
 
-  // Persist the event (raw “spread”) with a few helpful metadata fields
+  // Fetch shipping zipcode from ShipHero API
+  let shippingZipcode: string | null = null;
+  const orderUuid = body?.order_uuid ?? body?.order_id;
+  if (orderUuid) {
+    try {
+      shippingZipcode = await getOrderShippingZipcode(String(orderUuid));
+      if (shippingZipcode) {
+        log.info({ orderUuid, shippingZipcode }, "[packed_out] fetched shipping zipcode");
+      } else {
+        log.warn({ orderUuid }, "[packed_out] could not fetch shipping zipcode");
+      }
+    } catch (error) {
+      log.error({ orderUuid, error }, "[packed_out] error fetching shipping zipcode");
+    }
+  }
+
+  // Persist the event (raw "spread") with a few helpful metadata fields
   const eventRef = db
     .collection("packed_out")
     .doc(ymd)
@@ -264,6 +281,7 @@ export async function processOrderPackedOutWebhook(body: any): Promise<void> {
       ymd,
       source: "webhook",
       type: "packed_out",
+      shippingZipcode, // add zipcode to metadata
     },
     receivedAt: FieldValue.serverTimestamp(),
   };

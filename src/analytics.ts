@@ -260,6 +260,43 @@ export async function processOrderPackedOutWebhook(body: any): Promise<void> {
       shippingZipcode = await getOrderShippingZipcode(String(orderUuid));
       if (shippingZipcode) {
         log.info({ orderUuid, shippingZipcode }, "[packed_out] fetched shipping zipcode");
+        
+        // Check Firebase for distance value
+        try {
+          const distanceRef = db.collection("distances").doc(shippingZipcode);
+          const distanceSnap = await distanceRef.get();
+          if (distanceSnap.exists) {
+            const distanceData = distanceSnap.data();
+            const distanceValue = distanceData?.distance ?? distanceData?.value ?? null;
+            console.log(`[packed_out] Distance for zipcode ${shippingZipcode}:`, distanceValue);
+            log.info({ zipcode: shippingZipcode, distance: distanceValue }, "[packed_out] found distance in Firebase");
+            
+            // Increment total_distance collection
+            if (distanceValue !== null && typeof distanceValue === 'number') {
+              try {
+                const totalDistanceRef = db.collection("total_distance").doc("total");
+                await totalDistanceRef.set(
+                  {
+                    value: FieldValue.increment(distanceValue),
+                    lastUpdatedAt: FieldValue.serverTimestamp(),
+                  },
+                  { merge: true }
+                );
+                console.log(`[packed_out] Incremented total_distance by ${distanceValue}`);
+                log.info({ distance: distanceValue }, "[packed_out] incremented total_distance");
+              } catch (totalDistanceError) {
+                log.error({ distance: distanceValue, error: totalDistanceError }, "[packed_out] error incrementing total_distance");
+              }
+            } else {
+              log.warn({ zipcode: shippingZipcode, distanceValue }, "[packed_out] distance value is not a number, skipping total_distance increment");
+            }
+          } else {
+            console.log(`[packed_out] No distance found for zipcode ${shippingZipcode}`);
+            log.warn({ zipcode: shippingZipcode }, "[packed_out] no distance document found in Firebase");
+          }
+        } catch (distanceError) {
+          log.error({ zipcode: shippingZipcode, error: distanceError }, "[packed_out] error fetching distance from Firebase");
+        }
       } else {
         log.warn({ orderUuid }, "[packed_out] could not fetch shipping zipcode");
       }
